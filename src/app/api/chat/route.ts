@@ -115,6 +115,84 @@ Rules:
 4. Questions should test understanding, not just memorization
 5. Make sure each option is a plausible answer to avoid obvious choices
 
+This is a sample style, of the questions that should be asked:
+# Cognitive Science Practice Questions (Bermúdez-Based)
+
+---
+
+### **Question 1**
+**In Marr's model, depth and orientation information appears in which stage of visual processing?**
+
+- [ ] The primal sketch
+- [x] The 2.5D sketch
+- [ ] The 3D sketch
+
+---
+
+### **Question 2**
+**Electroencephalograms (EEGs) allow experimenters to study event-related potentials.**
+
+- [x] True
+- [ ] False
+
+---
+
+### **Question 3**
+**The patient S. M. who suffered damage to the amygdala showed deficits in experiencing and identifying which of the following emotions?**
+
+- [ ] Anger
+- [ ] Sadness
+- [ ] Disgust
+- [x] Fear
+
+---
+
+### **Question 4**
+**For Bayesians, a belief is a ...**
+
+- [ ] Truth value
+- [ ] Sentence in the language of thought
+- [x] Probability assignment
+
+---
+
+### **Question 5**
+**Dynamical systems theorists emphasize which of the following basic ideas?**
+
+- [x] The human mind is an autonomous problem-solver.
+- [ ] Human beings are embodied and embedded in their environments.
+- [ ] The multiple realizability of cognition.
+
+---
+
+### **Question 6**
+**“Neurons that wire together, fire together” is a description of which type of learning?**
+
+- [ ] Backpropagation of error.
+- [x] Hebbian learning.
+- [ ] Perceptron convergence.
+
+---
+
+### **Question 7**
+**Why are neural networks models important for thinking about language learning?**
+
+- [ ] Because of the poverty of the stimulus argument.
+- [ ] Because they are accurate models of how the brain works.
+- [x] Because they can mirror aspects of language learning without having linguistic rules explicitly coded into them.
+
+---
+
+### **Question 8**
+**Which of the following is a common feature of blindsight and neglect patients?**
+
+- [ ] They have no residual awareness in the regions of their visual field where they describe themselves as having conscious awareness.
+- [ ] They fail to respond to primes in the regions of their visual field where they lack conscious awareness.
+- [x] They typically do not initiate movements towards objects in the regions of their visual field where they lack conscious awareness.
+
+---
+
+
 You must respond with a JSON object containing a "quiz" array. Each question should have a "question" field and an "options" array where each option has "option" (string) and "correct" (boolean) properties.`,
       model: "gpt-4o",
       tools: [{ type: "file_search" }],
