@@ -1,7 +1,12 @@
 import { NextRequest } from "next/server";
 import OpenAI from "openai";
 
-export const maxDuration = 60;
+export const maxDuration = 120;
+
+// Maximum file size: 10MB per file
+const MAX_FILE_SIZE = 20 * 1024 * 1024; // 50MB
+// Maximum total upload size: 50MB
+const MAX_TOTAL_SIZE = 200 * 1024 * 1024; // 200MB
 
 const client = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -28,8 +33,23 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Validate that all files are PDFs
+    // Validate file count
+    if (files.length > 10) {
+      return new Response(
+        JSON.stringify({
+          message: "Too many files. Please upload a maximum of 10 PDF files.",
+        }),
+        {
+          status: 400,
+          headers: jsonHeaders,
+        },
+      );
+    }
+
+    // Validate files and calculate total size
+    let totalSize = 0;
     for (const file of files) {
+      // Check file type
       if (!file.name.toLowerCase().endsWith(".pdf")) {
         return new Response(
           JSON.stringify({
@@ -41,6 +61,34 @@ export async function POST(req: NextRequest) {
           },
         );
       }
+
+      // Check individual file size
+      if (file.size > MAX_FILE_SIZE) {
+        return new Response(
+          JSON.stringify({
+            message: `File ${file.name} is too large. Maximum file size is 10MB.`,
+          }),
+          {
+            status: 400,
+            headers: jsonHeaders,
+          },
+        );
+      }
+
+      totalSize += file.size;
+    }
+
+    // Check total upload size
+    if (totalSize > MAX_TOTAL_SIZE) {
+      return new Response(
+        JSON.stringify({
+          message: `Total upload size is too large. Maximum total size is 50MB.`,
+        }),
+        {
+          status: 400,
+          headers: jsonHeaders,
+        },
+      );
     }
 
     // Create a new vector store
@@ -57,13 +105,20 @@ export async function POST(req: NextRequest) {
 
     try {
       for (const file of files) {
-        // Upload file to OpenAI
-        const uploadedFile = await client.files.create({
-          file: file,
-          purpose: "assistants",
-        });
+        try {
+          // Upload file to OpenAI
+          const uploadedFile = await client.files.create({
+            file: file,
+            purpose: "assistants",
+          });
 
-        uploadedFileIds.push(uploadedFile.id);
+          uploadedFileIds.push(uploadedFile.id);
+        } catch (fileUploadError) {
+          console.error(`Failed to upload file ${file.name}:`, fileUploadError);
+          throw new Error(
+            `Failed to upload file ${file.name}. Please try again.`,
+          );
+        }
       }
 
       // Add all files to the vector store using batch create
@@ -131,10 +186,29 @@ export async function POST(req: NextRequest) {
     if (error && typeof error === "object" && "status" in error) {
       const openAIError = error as { status: number; message?: string };
       statusCode = openAIError.status;
-      errorMessage =
-        openAIError.message || `OpenAI API Error: ${openAIError.status}`;
+
+      if (openAIError.status === 413 || errorMessage.includes("too large")) {
+        errorMessage =
+          "One or more files are too large. Please reduce file sizes and try again.";
+        statusCode = 400;
+      } else {
+        errorMessage =
+          openAIError.message || `OpenAI API Error: ${openAIError.status}`;
+      }
     }
 
+    // Handle specific error types
+    if (
+      errorMessage.includes("Request Entity Too Large") ||
+      errorMessage.includes("413") ||
+      statusCode === 413
+    ) {
+      errorMessage =
+        "Files are too large. Please reduce file sizes and try again.";
+      statusCode = 400;
+    }
+
+    // Ensure we always return a valid JSON response
     return new Response(
       JSON.stringify({
         message: errorMessage,
@@ -145,10 +219,28 @@ export async function POST(req: NextRequest) {
       }),
       {
         status: statusCode,
-        headers: jsonHeaders,
+        headers: {
+          ...jsonHeaders,
+          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Methods": "POST, OPTIONS",
+          "Access-Control-Allow-Headers": "Content-Type",
+        },
       },
     );
   }
+}
+
+// Handle CORS preflight requests
+export async function OPTIONS() {
+  return new Response(null, {
+    status: 200,
+    headers: {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "POST, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type",
+      "Access-Control-Max-Age": "86400",
+    },
+  });
 }
 
 // Helper function to clean up resources on error

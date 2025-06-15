@@ -37,6 +37,8 @@ type UploadedFile = {
   file: File;
   id: string;
   name: string;
+  convertedName: string;
+  originalSize: number;
   status: "pending" | "uploading" | "uploaded" | "error";
   error?: string;
 };
@@ -49,6 +51,34 @@ function shuffleArray<T>(array: T[]): T[] {
     [newArray[i], newArray[j]] = [newArray[j], newArray[i]];
   }
   return newArray;
+}
+
+// Format file size for display
+function formatFileSize(bytes: number): string {
+  if (bytes === 0) return "0 Bytes";
+  const k = 1024;
+  const sizes = ["Bytes", "KB", "MB", "GB"];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
+}
+
+// Convert filename to snake_case format to prevent upload errors
+function toSnakeCase(filename: string): string {
+  // Get the file extension
+  const lastDotIndex = filename.lastIndexOf(".");
+  const name =
+    lastDotIndex > 0 ? filename.substring(0, lastDotIndex) : filename;
+  const extension = lastDotIndex > 0 ? filename.substring(lastDotIndex) : "";
+
+  // Convert name to snake_case
+  const snakeCaseName = name
+    .toLowerCase()
+    .replace(/[\s\-]+/g, "_") // Replace spaces and hyphens with underscores
+    .replace(/[^a-z0-9_]/g, "") // Remove special characters except underscores
+    .replace(/_+/g, "_") // Replace multiple underscores with single underscore
+    .replace(/^_|_$/g, ""); // Remove leading/trailing underscores
+
+  return snakeCaseName + extension;
 }
 
 export default function PdfQuizPage() {
@@ -68,18 +98,39 @@ export default function PdfQuizPage() {
   const [quizStarted, setQuizStarted] = useState(false);
   const [quizFinished, setQuizFinished] = useState(false);
 
-  const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
     if (!files) return;
 
     const newFiles: UploadedFile[] = [];
+    const maxFileSize = 500 * 1024 * 1024; // 500MB file size limit
+
+    // First pass: validate files and create file objects
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
       if (file.type === "application/pdf") {
+        if (file.size > maxFileSize) {
+          setError(
+            `File "${file.name}" (${formatFileSize(file.size)}) is too large. Maximum file size is 500MB.`,
+          );
+          return;
+        }
+
+        // Convert filename to snake_case to prevent upload errors
+        const snakeCaseFilename = toSnakeCase(file.name);
+
+        // Create a new File object with snake_case name
+        const renamedFile = new File([file], snakeCaseFilename, {
+          type: file.type,
+          lastModified: file.lastModified,
+        });
+
         newFiles.push({
-          file,
+          file: renamedFile,
           id: Math.random().toString(36).substr(2, 9),
-          name: file.name,
+          name: file.name, // Keep original name for display
+          convertedName: snakeCaseFilename, // Snake case name for upload
+          originalSize: file.size,
           status: "pending",
         });
       }
@@ -90,6 +141,12 @@ export default function PdfQuizPage() {
       return;
     }
 
+    if (selectedFiles.length + newFiles.length > 10) {
+      setError("Too many files. Maximum of 10 PDF files allowed.");
+      return;
+    }
+
+    // Add files to state
     setSelectedFiles((prev) => [...prev, ...newFiles]);
     setError(null);
 
@@ -180,10 +237,31 @@ export default function PdfQuizPage() {
       if (!response.ok) {
         let errorMsg = `Upload Error: ${response.status}`;
         try {
-          const errorData = await response.json();
-          errorMsg = errorData.message || errorData.error || errorMsg;
-        } catch (e) {
-          errorMsg = response.statusText || `${e}`;
+          const responseText = await response.text();
+          // Try to parse as JSON first
+          try {
+            const errorData = JSON.parse(responseText);
+            errorMsg = errorData.message || errorData.error || errorMsg;
+          } catch {
+            // If not JSON, check for common error patterns
+            if (
+              responseText.includes("Request Entity Too Large") ||
+              response.status === 413
+            ) {
+              errorMsg =
+                "Files are too large. Please reduce file sizes and try again.";
+            } else if (
+              responseText.includes("too large") ||
+              responseText.includes("413")
+            ) {
+              errorMsg =
+                "Files are too large. Please reduce file sizes and try again.";
+            } else {
+              errorMsg = response.statusText || `HTTP ${response.status}`;
+            }
+          }
+        } catch {
+          errorMsg = response.statusText || `HTTP ${response.status}`;
         }
         throw new Error(errorMsg);
       }
@@ -255,10 +333,24 @@ export default function PdfQuizPage() {
       if (!response.ok) {
         let errorMsg = `API Error: ${response.status}`;
         try {
-          const errorData = await response.json();
-          errorMsg = errorData.message || errorData.error || errorMsg;
-        } catch (e) {
-          errorMsg = response.statusText || `${e}`;
+          const responseText = await response.text();
+          // Try to parse as JSON first
+          try {
+            const errorData = JSON.parse(responseText);
+            errorMsg = errorData.message || errorData.error || errorMsg;
+          } catch {
+            // If not JSON, provide a better error message
+            if (response.status === 413) {
+              errorMsg =
+                "Request too large. Please try with fewer or smaller files.";
+            } else if (response.status >= 500) {
+              errorMsg = "Server error. Please try again later.";
+            } else {
+              errorMsg = response.statusText || `HTTP ${response.status}`;
+            }
+          }
+        } catch {
+          errorMsg = response.statusText || `HTTP ${response.status}`;
         }
         throw new Error(errorMsg);
       }
@@ -366,7 +458,7 @@ export default function PdfQuizPage() {
       case "uploaded":
         return "Uploaded successfully";
       case "error":
-        return "Upload failed";
+        return "Processing failed";
       default:
         return "Unknown status";
     }
@@ -645,7 +737,13 @@ export default function PdfQuizPage() {
                             <p className="text-sm font-medium text-gray-900 truncate max-w-xs">
                               {fileObj.name}
                             </p>
+                            {fileObj.name !== fileObj.convertedName && (
+                              <p className="text-xs text-gray-400 truncate max-w-xs">
+                                Uploaded as: {fileObj.convertedName}
+                              </p>
+                            )}
                             <p className="text-xs text-gray-500">
+                              {formatFileSize(fileObj.originalSize)} •{" "}
                               {getFileStatusText(fileObj.status)}
                             </p>
                             {fileObj.error && (
@@ -707,6 +805,7 @@ export default function PdfQuizPage() {
               <div className="text-center text-sm text-gray-500">
                 Upload multiple PDF files to create a comprehensive quiz
                 covering all your study materials
+                <br />
               </div>
             </div>
           </CardContent>

@@ -29,7 +29,12 @@ const QuizSchema = z.object({
     .max(10, "The quiz cannot have more than 10 questions."),
 });
 
-const jsonHeaders = { "Content-Type": "application/json" };
+const jsonHeaders = {
+  "Content-Type": "application/json",
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type",
+};
 
 export async function POST(req: Request) {
   try {
@@ -281,4 +286,17 @@ Please analyze the documents using file search and create comprehensive quiz que
       },
     );
   }
+}
+
+// Handle CORS preflight requests
+export async function OPTIONS() {
+  return new Response(null, {
+    status: 200,
+    headers: {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "POST, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type",
+      "Access-Control-Max-Age": "86400",
+    },
+  });
 }
