@@ -182,8 +182,8 @@ export default function PdfQuizPage() {
         try {
           const errorData = await response.json();
           errorMsg = errorData.message || errorData.error || errorMsg;
-        } catch (_) {
-          errorMsg = response.statusText || errorMsg;
+        } catch (e) {
+          errorMsg = response.statusText || `${e}`;
         }
         throw new Error(errorMsg);
       }
@@ -257,8 +257,8 @@ export default function PdfQuizPage() {
         try {
           const errorData = await response.json();
           errorMsg = errorData.message || errorData.error || errorMsg;
-        } catch (_) {
-          errorMsg = response.statusText || errorMsg;
+        } catch (e) {
+          errorMsg = response.statusText || `${e}`;
         }
         throw new Error(errorMsg);
       }
