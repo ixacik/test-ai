@@ -108,6 +108,8 @@ export async function POST(req: Request) {
       name: "Quiz Generator Assistant",
       instructions: `You are an expert quiz generator. Your task is to create high-quality multiple-choice questions based on the content in the provided documents.
 
+      USE ONLY THE INFORMATION FOUND IN THE PROVIDED DOCUMENTS. Do not GENERATE Any New CONTENT! And closely follow the structure and vibe of the provided example questions.
+
 Rules:
 1. Generate exactly 10 multiple-choice questions
 2. Each question must have exactly 4 options
@@ -116,10 +118,6 @@ Rules:
 5. Make sure each option is a plausible answer to avoid obvious choices
 
 This is a sample style, of the questions that should be asked:
-# Cognitive Science Practice Questions (Bermúdez-Based)
-
----
-
 ### **Question 1**
 **In Marr's model, depth and orientation information appears in which stage of visual processing?**
 
