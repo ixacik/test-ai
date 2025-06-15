@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import OpenAI from "openai";
 
-export const maxDuration = 120;
+export const maxDuration = 60;
 
 // Maximum file size: 10MB per file
 const MAX_FILE_SIZE = 20 * 1024 * 1024; // 50MB
