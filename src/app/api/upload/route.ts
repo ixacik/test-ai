@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import OpenAI from "openai";
 
-export const maxDuration = 120;
+export const maxDuration = 60;
 
 const client = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
